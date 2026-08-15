@@ -1,0 +1,41 @@
+name: Indexador - traer recursos nuevos
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: "0 15 * * 0"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: indexer
+  cancel-in-progress: false
+
+jobs:
+  index:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm ci
+
+      - run: node indexer.js
+        env:
+          TG_API_ID: ${{ secrets.TG_API_ID }}
+          TG_API_HASH: ${{ secrets.TG_API_HASH }}
+          TG_SESSION: ${{ secrets.TG_SESSION }}
+          TG_CHANNEL: ${{ secrets.TG_CHANNEL }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+      - name: Guardar recursos nuevos
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/recursos.db
+          git diff --cached --quiet || git commit -m "indexer: recursos nuevos [skip ci]"
+          git push

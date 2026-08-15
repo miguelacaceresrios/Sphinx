@@ -1,0 +1,19 @@
+{
+  "name": "sphinx",
+  "version": "0.1.0",
+  "description": "Sphinx — bot de consulta + indexador de recursos de un canal de Telegram, con resúmenes generados por IA.",
+  "type": "module",
+  "scripts": {
+    "index": "node indexer.js",
+    "bot": "node bot-local.js",
+    "bot:poll": "node bot-poll.js"
+  },
+  "dependencies": {
+    "telegram": "^2.22.2",
+    "input": "^1.0.1",
+    "telegraf": "^4.16.3",
+    "better-sqlite3": "^11.3.0",
+    "@anthropic-ai/sdk": "^0.27.3",
+    "dotenv": "^16.4.5"
+  }
+}

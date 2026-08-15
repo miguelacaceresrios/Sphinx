@@ -1,0 +1,8 @@
+node_modules/
+.env
+data/session.txt
+
+# data/recursos.db SÍ se commitea a propósito: es como GitHub Actions persiste el
+# estado (recursos indexados + último update_id del bot) entre corridas, ya que los
+# runners son efímeros y no hay servidor propio guardando el archivo.
+data/*.db-*
