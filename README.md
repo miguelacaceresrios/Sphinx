@@ -2,8 +2,10 @@
 
 Este proyecto tiene dos partes:
 
-1. **Indexador** (`indexer.js`): escanea un canal de Telegram, guarda cada archivo nuevo en una base de datos y le genera un resumen corto con IA.
-2. **Bot de consulta** (`bot.js`): un bot de Telegram al que le escribes en lenguaje natural ("¿qué mapas hay?") y te responde buscando en lo ya indexado.
+1. **Indexador** (`indexer.js`): escanea un canal de Telegram y guarda cada archivo nuevo (nombre, caption, tipo) en una base de datos.
+2. **Bot de consulta** (`bot.js`): un bot de Telegram al que le escribes una palabra clave ("mapas", "reglas de combate") y te devuelve la lista de archivos que coinciden, con link directo al mensaje.
+
+Sin IA de por medio — es búsqueda directa por texto, cero costo de tokens.
 
 No necesitas saber programar para usarlo, solo seguir estos pasos en orden.
 
@@ -35,13 +37,7 @@ Esto descarga todo lo necesario, solo se hace una vez.
 2. Escríbele `/newbot` y sigue las instrucciones (nombre, username)
 3. Te da un **token** (algo como `123456:ABC-DEF...`) — cópialo
 
-## Paso 4 — Sacar tu API key de Anthropic (para los resúmenes y respuestas)
-
-1. Entra a https://console.anthropic.com
-2. Crea una API key
-3. Cópiala
-
-## Paso 5 — Configurar el archivo `.env`
+## Paso 4 — Configurar el archivo `.env`
 
 1. Copia el archivo `.env.example` y renómbralo a `.env`
 2. Ábrelo y pega ahí todo lo que sacaste en los pasos anteriores:
@@ -51,10 +47,9 @@ TG_API_ID=          (del paso 2)
 TG_API_HASH=        (del paso 2)
 TG_CHANNEL=          (el @usuario del canal, ej: @nombredelcanal)
 TG_BOT_TOKEN=       (del paso 3)
-ANTHROPIC_API_KEY=  (del paso 4)
 ```
 
-## Paso 6 — Indexar el canal (primera vez)
+## Paso 5 — Indexar el canal (primera vez)
 
 ```
 npm run index
@@ -66,15 +61,15 @@ Esto va a tardar según cuántos archivos tenga el canal — va mostrando en la 
 
 **Corre este comando cada vez que quieras traer lo nuevo** (solo procesa lo que no ha visto, no repite trabajo).
 
-## Paso 7 — Probar el bot localmente (opcional)
+## Paso 6 — Probar el bot localmente (opcional)
 
 ```
 npm run bot
 ```
 
-Esto prende el bot en tu máquina para probarlo. Mientras esta terminal esté abierta, el bot responde; si la cierras, deja de responder. **Para que quede funcionando siempre, sin depender de tu compu, seguí con el Paso 8** — ahí es donde queda desplegado de verdad.
+Esto prende el bot en tu máquina para probarlo. Mientras esta terminal esté abierta, el bot responde; si la cierras, deja de responder. **Para que quede funcionando siempre, sin depender de tu compu, seguí con el Paso 7** — ahí es donde queda desplegado de verdad.
 
-## Paso 8 — Dejarlo corriendo solo, gratis, sin tu compu (GitHub Actions)
+## Paso 7 — Dejarlo corriendo solo, gratis, sin tu compu (GitHub Actions)
 
 Esto usa GitHub Actions: GitHub revisa cada 30 minutos si hay mensajes nuevos para el bot, y una vez por semana si hay archivos nuevos en el canal — todo gratis, sin servidor ni computadora prendida. La única espera es que una respuesta puede tardar hasta 30 min en llegar (no es al instante), pero como esto se usa muy poco, no debería notarse.
 
@@ -90,7 +85,7 @@ Esto usa GitHub Actions: GitHub revisa cada 30 minutos si hay mensajes nuevos pa
    (El `.env` no se sube — está en `.gitignore` a propósito.)
 
 2. **Genera la sesión de Telegram** para que el indexador pueda correr solo, sin que nadie escriba el código por SMS cada vez:
-   - Corre `npm run index` local una vez (el Paso 6) — esto crea `data/session.txt`.
+   - Corre `npm run index` local una vez (el Paso 5) — esto crea `data/session.txt`.
    - Abre ese archivo y copia todo su contenido (es un texto largo).
 
 3. **Agrega los secrets en GitHub**: en tu repo, ve a **Settings → Secrets and variables → Actions → New repository secret**, y crea uno por cada variable de tu `.env`, con el mismo nombre:
@@ -98,7 +93,6 @@ Esto usa GitHub Actions: GitHub revisa cada 30 minutos si hay mensajes nuevos pa
    - `TG_API_HASH`
    - `TG_CHANNEL`
    - `TG_BOT_TOKEN`
-   - `ANTHROPIC_API_KEY`
    - `ALLOWED_USER_IDS` (si lo usas)
    - `TG_SESSION` — el contenido que copiaste en el paso 2
 
@@ -111,3 +105,4 @@ Esto usa GitHub Actions: GitHub revisa cada 30 minutos si hay mensajes nuevos pa
 - La base de datos queda en `data/recursos.db`. En este modo desplegado, GitHub Actions la actualiza y la guarda en el propio repo automáticamente después de cada corrida — no hay que hacer nada manual.
 - Si quieres restringir quién puede usar el bot, pon tu ID de Telegram (te lo da @userinfobot) en `ALLOWED_USER_IDS` del `.env` (y del secret correspondiente en GitHub).
 - El indexador detecta duplicados por hash, así que si alguien resube el mismo archivo con otro nombre, no lo vuelve a procesar.
+- La búsqueda del bot es por palabra clave contra el nombre de archivo, el caption y la categoría — si el archivo no tiene nombre ni caption claro, va a aparecer tal cual lo subieron.

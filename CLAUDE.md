@@ -1,13 +1,13 @@
 # Contexto del proyecto — Sphinx
 
-Sphinx: indexador + bot de consulta para un canal de Telegram. El objetivo: la gente sube archivos a un canal sin explicar qué son, y este proyecto los indexa, les genera un resumen corto con IA, y deja un bot al que cualquiera (sin conocimientos técnicos) le puede preguntar en lenguaje natural para encontrar recursos.
+Sphinx: indexador + bot de consulta para un canal de Telegram. El objetivo: la gente sube archivos a un canal sin explicar qué son, y este proyecto los indexa (nombre, caption, tipo) y deja un bot al que cualquiera (sin conocimientos técnicos) le puede escribir una palabra clave para encontrar recursos. Sin IA: se descartó a propósito (ver "Decisiones de diseño") para no depender de tokens/costo — es búsqueda por texto directa contra SQLite.
 
 Se usa muy poco (según el usuario, "cada mil años"), así que el objetivo explícito es que **no dependa de la máquina ni de la cuenta de nadie estando prendida** — todo corre en GitHub Actions, gratis, bajo demanda.
 
 ## Arquitectura
 
-- **`indexer.js`** — Se conecta a Telegram con **GramJS** (MTProto, usando la cuenta de usuario, no un bot — porque solo somos miembros del canal, no admins). Escanea mensajes nuevos desde el último `message_id` guardado, detecta duplicados por hash, y para cada archivo nuevo genera un resumen corto llamando a la API de Anthropic (modelo `claude-haiku-4-5-20251001`, el más barato — no hace falta más para resúmenes cortos).
-- **`bot.js`** — Configura el bot de Telegraf (comandos, permisos, búsqueda + respuesta con Claude) pero **no lo arranca**. Dos entrypoints distintos lo importan:
+- **`indexer.js`** — Se conecta a Telegram con **GramJS** (MTProto, usando la cuenta de usuario, no un bot — porque solo somos miembros del canal, no admins). Escanea mensajes nuevos desde el último `message_id` guardado, detecta duplicados por hash, y guarda nombre/caption/tipo tal cual vienen del mensaje — sin generar nada con IA.
+- **`bot.js`** — Configura el bot de Telegraf (comandos, permisos, búsqueda por palabra clave contra SQLite, respuesta como lista formateada) pero **no lo arranca**. Dos entrypoints distintos lo importan:
   - **`bot-local.js`** (`npm run bot`) — long polling normal, para probar en tu máquina.
   - **`bot-poll.js`** (`npm run bot:poll`) — hace un solo `getUpdates`, procesa lo pendiente, guarda el último `update_id` en la tabla `bot_estado`, y termina. Es el que corre en GitHub Actions.
 - **`db.js`** — SQLite (`better-sqlite3`), **sin WAL** (a propósito: así todo el estado vive en un único archivo `data/recursos.db`, sin un `-wal` aparte que se pueda perder al no commitearlo). Tablas: `recursos` (cada archivo indexado), `estado_indexado` (último `message_id` procesado por canal) y `bot_estado` (último `update_id` de Telegram procesado por el bot).
@@ -33,7 +33,7 @@ Ambos workflows necesitan `contents: write` para poder pushear el commit del est
 
 ## Decisiones de diseño importantes
 
-- **Sin presupuesto, sin VPS, sin máquina propia prendida.** Todo corre gratis en GitHub Actions (minutos gratis de sobra para este volumen de uso).
+- **Sin presupuesto, sin VPS, sin máquina propia prendida, sin IA.** Todo corre gratis en GitHub Actions (minutos gratis de sobra para este volumen de uso). Se sacó Anthropic del todo (indexer ya no genera resumen, bot ya no redacta respuesta) porque el usuario explícitamente no quiere gastar en tokens y el caso de uso real es simple: leer metadata que ya existe e importarla, no generar contenido nuevo.
 - **Bot API descartada para el indexador** porque no somos admins del canal — solo funciona MTProto con cuenta de usuario (GramJS).
 - **Se descartó long polling 24/7 como forma de producción** (se usaba así al principio, local) — se cambió a poll único vía cron de GitHub Actions porque el bot se usa con muy poca frecuencia y no vale la pena mantener nada prendido todo el tiempo.
 - **Se descartó un VM gratis (Oracle Cloud Free Tier)** para esto — es una solución pensada para algo que corre 24/7; overkill para algo que se consulta ocasionalmente. Ver comparación completa que se discutió: VM = simple pero hay que mantenerlo prendido y configurarlo; webhook serverless = respuesta instantánea pero obliga a reescribir el bot y cambiar de base de datos; **GitHub Actions con cron = elegido**, cero mantenimiento, cero costo, tolera el delay de hasta 30 min entre polls.

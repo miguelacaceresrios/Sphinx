@@ -30,7 +30,6 @@ jobs:
           TG_API_HASH: ${{ secrets.TG_API_HASH }}
           TG_SESSION: ${{ secrets.TG_SESSION }}
           TG_CHANNEL: ${{ secrets.TG_CHANNEL }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
       - name: Guardar recursos nuevos
         run: |

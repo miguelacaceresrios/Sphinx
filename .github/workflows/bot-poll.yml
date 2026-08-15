@@ -27,7 +27,6 @@ jobs:
       - run: node bot-poll.js
         env:
           TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           ALLOWED_USER_IDS: ${{ secrets.ALLOWED_USER_IDS }}
 
       - name: Guardar estado del bot

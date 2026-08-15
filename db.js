@@ -13,7 +13,6 @@ CREATE TABLE IF NOT EXISTS recursos (
   caption TEXT,
   tipo TEXT,
   hash TEXT,
-  resumen TEXT,
   categoria TEXT,
   fecha_mensaje TEXT,
   link_mensaje TEXT,
@@ -51,8 +50,8 @@ export function existeHash(hash) {
 export function guardarRecurso(r) {
   db.prepare(`
     INSERT OR IGNORE INTO recursos
-      (message_id, canal, nombre_archivo, caption, tipo, hash, resumen, categoria, fecha_mensaje, link_mensaje)
-    VALUES (@message_id, @canal, @nombre_archivo, @caption, @tipo, @hash, @resumen, @categoria, @fecha_mensaje, @link_mensaje)
+      (message_id, canal, nombre_archivo, caption, tipo, hash, categoria, fecha_mensaje, link_mensaje)
+    VALUES (@message_id, @canal, @nombre_archivo, @caption, @tipo, @hash, @categoria, @fecha_mensaje, @link_mensaje)
   `).run(r);
 }
 
@@ -60,9 +59,9 @@ export function buscarRecursos(query, limite = 15) {
   const like = `%${query}%`;
   return db.prepare(`
     SELECT * FROM recursos
-    WHERE nombre_archivo LIKE ? OR caption LIKE ? OR resumen LIKE ? OR categoria LIKE ?
+    WHERE nombre_archivo LIKE ? OR caption LIKE ? OR categoria LIKE ?
     ORDER BY id DESC LIMIT ?
-  `).all(like, like, like, like, limite);
+  `).all(like, like, like, limite);
 }
 
 export function listarTodo(limite = 50) {

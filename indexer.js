@@ -1,13 +1,12 @@
 // indexer.js
-// Escanea el canal, guarda metadata de cada archivo nuevo y genera un resumen corto con Claude.
-// Se corre manualmente (`npm run index`) o vía cron / GitHub Actions.
+// Escanea el canal y guarda la metadata de cada archivo nuevo tal cual viene de Telegram
+// (nombre, caption, tipo). Se corre manualmente (`npm run index`) o vía GitHub Actions.
 
 import "dotenv/config";
 import { TelegramClient } from "telegram";
 import { StringSession } from "telegram/sessions/index.js";
 import input from "input";
 import crypto from "crypto";
-import Anthropic from "@anthropic-ai/sdk";
 import {
   getUltimoMessageId,
   setUltimoMessageId,
@@ -27,30 +26,6 @@ const SESSION_FILE = "data/session.txt";
 const sessionString =
   process.env.TG_SESSION ||
   (fs.existsSync(SESSION_FILE) ? fs.readFileSync(SESSION_FILE, "utf-8") : "");
-
-const anthropic = process.env.ANTHROPIC_API_KEY
-  ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-  : null;
-
-async function generarResumen(nombreArchivo, caption) {
-  if (!anthropic) return null;
-  try {
-    const msg = await anthropic.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 120,
-      messages: [
-        {
-          role: "user",
-          content: `Nombre de archivo: "${nombreArchivo || "sin nombre"}"\nCaption del mensaje: "${caption || "sin caption"}"\n\nEn una sola frase corta (máx 20 palabras), en español, di para qué sirve o qué es este recurso, basándote solo en esa información. Si no hay suficiente información, dilo brevemente.`,
-        },
-      ],
-    });
-    return msg.content.find((b) => b.type === "text")?.text?.trim() ?? null;
-  } catch (err) {
-    console.error("Error generando resumen:", err.message);
-    return null;
-  }
-}
 
 function categorizar(nombre, caption) {
   const texto = `${nombre || ""} ${caption || ""}`.toLowerCase();
@@ -113,7 +88,6 @@ async function main() {
       continue;
     }
 
-    const resumen = await generarResumen(nombreArchivo, caption);
     const categoria = categorizar(nombreArchivo, caption);
 
     guardarRecurso({
@@ -123,14 +97,13 @@ async function main() {
       caption,
       tipo: doc?.mimeType || "desconocido",
       hash,
-      resumen,
       categoria,
       fecha_mensaje: m.date ? new Date(m.date * 1000).toISOString() : null,
       link_mensaje: `https://t.me/c/${String(entity.id).replace("-100", "")}/${m.id}`,
     });
 
     nuevos++;
-    console.log(`✅ Indexado: ${nombreArchivo} → ${resumen || "(sin resumen)"}`);
+    console.log(`✅ Indexado: ${nombreArchivo}${caption ? ` — ${caption}` : ""}`);
   }
 
   setUltimoMessageId(canal, maxId);

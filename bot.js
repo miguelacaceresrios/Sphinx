@@ -2,14 +2,13 @@
 // Configura el bot de Telegram (comandos, permisos, lógica de búsqueda) pero no lo arranca.
 // Quien lo importa decide cómo correrlo: long polling local (bot-local.js) o un solo
 // chequeo de mensajes pendientes (bot-poll.js, pensado para GitHub Actions).
+// Sin IA: busca por palabra clave y devuelve la lista tal cual, sin gastar tokens.
 
 import "dotenv/config";
 import { Telegraf } from "telegraf";
-import Anthropic from "@anthropic-ai/sdk";
 import { buscarRecursos, listarTodo, contarRecursos } from "./db.js";
 
 export const bot = new Telegraf(process.env.TG_BOT_TOKEN);
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 const allowedIds = (process.env.ALLOWED_USER_IDS || "")
   .split(",")
@@ -38,11 +37,7 @@ bot.on("text", async (ctx) => {
   const pregunta = ctx.message.text;
   if (pregunta.startsWith("/")) return;
 
-  await ctx.sendChatAction("typing");
-
-  // Búsqueda simple por palabras clave de la pregunta, y le pasamos los resultados a Claude
-  // para que arme una respuesta en lenguaje natural (no es necesario que el usuario sepa
-  // cómo se llama exactamente el archivo).
+  // Búsqueda simple por palabras clave de la pregunta — sin IA, directo contra SQLite.
   const palabrasClave = pregunta
     .toLowerCase()
     .replace(/[¿?¡!.,]/g, "")
@@ -63,25 +58,18 @@ bot.on("text", async (ctx) => {
     return true;
   });
 
-  const contexto = candidatos
+  if (candidatos.length === 0) {
+    await ctx.reply("No encontré nada con esas palabras. Intenta con otro término.");
+    return;
+  }
+
+  const texto = candidatos
     .slice(0, 25)
     .map(
       (r) =>
-        `- [${r.categoria}] ${r.nombre_archivo}${r.resumen ? ` — ${r.resumen}` : ""} (${r.link_mensaje})`
+        `[${r.categoria}] ${r.nombre_archivo}${r.caption ? ` — ${r.caption}` : ""}\n${r.link_mensaje}`
     )
-    .join("\n");
+    .join("\n\n");
 
-  const respuesta = await anthropic.messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 500,
-    messages: [
-      {
-        role: "user",
-        content: `Eres un asistente que ayuda a encontrar recursos en un canal de Telegram indexado. Aquí están los recursos relevantes que encontré para la pregunta del usuario:\n\n${contexto || "(no se encontraron coincidencias)"}\n\nPregunta del usuario: "${pregunta}"\n\nResponde en español, de forma breve y clara, en formato de lista si aplica. Si no hay resultados relevantes, dilo directamente y sugiere reformular la pregunta. No inventes recursos que no estén en la lista.`,
-      },
-    ],
-  });
-
-  const texto = respuesta.content.find((b) => b.type === "text")?.text ?? "No pude generar una respuesta.";
   await ctx.reply(texto);
 });
