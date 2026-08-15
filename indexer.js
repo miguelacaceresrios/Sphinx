@@ -32,17 +32,28 @@ const sessionString =
 // Por eso los links "+..." se resuelven a mano con CheckChatInvite.
 async function resolverCanal(client, canal) {
   const invite = canal.match(/t\.me\/\+([\w-]+)/i) || canal.match(/^\+([\w-]+)$/);
-  if (!invite) return client.getEntity(canal);
-
-  const resultado = await client.invoke(
-    new Api.messages.CheckChatInvite({ hash: invite[1] })
-  );
-  if (resultado instanceof Api.ChatInviteAlready || resultado.chat) {
-    return resultado.chat;
+  if (invite) {
+    const resultado = await client.invoke(
+      new Api.messages.CheckChatInvite({ hash: invite[1] })
+    );
+    if (resultado instanceof Api.ChatInviteAlready || resultado.chat) {
+      return resultado.chat;
+    }
+    throw new Error(
+      "No eres miembro de ese canal todavía — únete desde la app de Telegram y corre el indexador de nuevo."
+    );
   }
-  throw new Error(
-    "No eres miembro de ese canal todavía — únete desde la app de Telegram y corre el indexador de nuevo."
-  );
+
+  // Link a un mensaje puntual dentro de un canal privado (t.me/c/ID/mensaje) — de ahí
+  // sacamos el ID del canal. Hace falta haber cargado los diálogos al menos una vez
+  // para que GramJS tenga en caché el access_hash de un canal privado.
+  const canalPrivado = canal.match(/t\.me\/c\/(\d+)/i);
+  if (canalPrivado) {
+    await client.getDialogs({});
+    return client.getEntity(canalPrivado[1]);
+  }
+
+  return client.getEntity(canal);
 }
 
 function categorizar(nombre, caption) {
