@@ -3,7 +3,7 @@
 // (nombre, caption, tipo). Se corre manualmente (`npm run index`) o vía GitHub Actions.
 
 import "dotenv/config";
-import { TelegramClient } from "telegram";
+import { TelegramClient, Api } from "telegram";
 import { StringSession } from "telegram/sessions/index.js";
 import input from "input";
 import crypto from "crypto";
@@ -26,6 +26,24 @@ const SESSION_FILE = "data/session.txt";
 const sessionString =
   process.env.TG_SESSION ||
   (fs.existsSync(SESSION_FILE) ? fs.readFileSync(SESSION_FILE, "utf-8") : "");
+
+// La versión de GramJS instalada solo reconoce links de invitación viejos
+// (t.me/joinchat/HASH), no el formato nuevo (t.me/+HASH) que usa Telegram hoy.
+// Por eso los links "+..." se resuelven a mano con CheckChatInvite.
+async function resolverCanal(client, canal) {
+  const invite = canal.match(/t\.me\/\+([\w-]+)/i) || canal.match(/^\+([\w-]+)$/);
+  if (!invite) return client.getEntity(canal);
+
+  const resultado = await client.invoke(
+    new Api.messages.CheckChatInvite({ hash: invite[1] })
+  );
+  if (resultado instanceof Api.ChatInviteAlready || resultado.chat) {
+    return resultado.chat;
+  }
+  throw new Error(
+    "No eres miembro de ese canal todavía — únete desde la app de Telegram y corre el indexador de nuevo."
+  );
+}
 
 function categorizar(nombre, caption) {
   const texto = `${nombre || ""} ${caption || ""}`.toLowerCase();
@@ -55,7 +73,7 @@ async function main() {
   fs.writeFileSync(SESSION_FILE, client.session.save());
   console.log("✅ Sesión guardada en", SESSION_FILE);
 
-  const entity = await client.getEntity(canal);
+  const entity = await resolverCanal(client, canal);
   const ultimoId = getUltimoMessageId(canal);
   console.log(`Escaneando "${canal}" desde message_id > ${ultimoId}...`);
 
